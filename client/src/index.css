@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+input{
+  @apply px-4 py-2 text-sm outline-none ring-2 shadow-xl rounded-md text-blue-800;
+}
+
+body, #root{
+  background-color: rgb(22, 22, 22);
+  font-family: nunito;
+  height: 100vh;
+}
+
+#main-container{
+  height: calc(100% - 4rem);
+}
+
+.my-message{
+  @apply px-2 my-2 rounded-md;
+}
+
+.message{
+  @apply px-2 py-2 bg-gray-200 my-2 rounded-md;
+}
+
+/* #nav-pane{
+  height: calc(100% - 4rem);
+  width: calc(100% - 3rem);
+} */
+
+#message-box{
+  height:calc(100% - 4rem);
+}
+
+.nav-width{
+  width: calc(100% - 3rem);
+}
+
+.nav-height{
+  height: calc(100% - 4rem);
+}
