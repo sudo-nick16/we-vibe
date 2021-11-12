@@ -1,267 +1,296 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useHistory } from 'react-router';
 import { io } from 'socket.io-client';
-import ss from 'socket.io-stream';
-// import RTCMultiConnection from 'rtcmulticonnection';
-
-// webrtc setup
-const connection = new RTCPeerConnection(
-    {
-        iceServers: [
-            {
-                urls: 'stun:stun.l.google.com:19302'
-            }
-        ]
-    }
-);
+import {v4 as uuid} from 'uuid';
+import CustomAudio from './CustomAudio'
+import { UserContext } from '../context/UserContext';
+import track from './track.png'
+import Login from './Login';
+import dotenv from 'dotenv'
+dotenv.config()
 
 
-connection.onicecandidate = (event) => {
-    let offer = connection.localDescription;
-    // console.log(offer);
-}
-
-
-const dc = connection.createDataChannel("channel");
-
-connection.ondatachannel = e => {
-    console.log("data channel is opened", e.channel)
-    e.channel.onmessage = (e) => {
-        console.log("message : ", e.data)
-    }
-}
-dc.onmessage = (e) => {
-    // sourceBuffer.appendBuffer(e.data)
-    console.log("message : ", e.data)
-}
-
-dc.onopen = (e) => {
-    console.log("data channel is opened")
-}
-
-
-const socket = io('http://localhost:3005', {forceNew: true});
-var counter = 0;
+const socket = io(process.env.REACT_APP_SOCKET_URL, {forceNew: true});
 
 const audio = new Audio();
-// audio.on = () => {
-//     audio.play();
-// }
-
-const ctx = new AudioContext()
-
-const mediaSource = new MediaSource();
-audio.src = window.URL.createObjectURL(mediaSource);
-var queue = []
-var sourceBuffer;
-
-mediaSource.addEventListener('sourceopen', function(e) { console.log('sourceopen: ' + mediaSource.readyState); });
-mediaSource.addEventListener('sourceended', function(e) { console.log('sourceended: ' + mediaSource.readyState); });
-mediaSource.addEventListener('sourceclose', function(e) { console.log('sourceclose: ' + mediaSource.readyState); });
-mediaSource.addEventListener('error', function(e) { console.log('error: ' + mediaSource.readyState); });
-    
-    
-mediaSource.addEventListener('sourceopen', function(e){
-    console.log('sourceopen');
-    audio.play();
-    try{
-        sourceBuffer = mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
-        
-        sourceBuffer.addEventListener('updatestart', function(e) { console.log('updatestart: ' + mediaSource.readyState); });
-        sourceBuffer.addEventListener('update', function(e) { console.log('update: ' + mediaSource.readyState); });
-        sourceBuffer.addEventListener('updateend', function(e) { console.log('updateend: ' + mediaSource.readyState); });
-        sourceBuffer.addEventListener('error', function(e) { console.log('error: ' + mediaSource.readyState); });
-        sourceBuffer.addEventListener('abort', function(e) { console.log('abort: ' + mediaSource.readyState); });
-        
-        sourceBuffer.addEventListener('update', function() { // Note: Have tried 'updateend'
-            if (queue.length > 0 && !sourceBuffer.updating) {
-                sourceBuffer.appendBuffer(queue.shift());
-            }
-        });
-        
-        socket.on("songStream", data =>{
-            
-            if (typeof data !== 'string') {
-                if (sourceBuffer.updating || mediaSource.readyState != "open" || queue.length > 0) {
-                  queue.push(e.data);
-                } else {
-                    console.log("getting boi.... TT",data);
-                  sourceBuffer.appendBuffer(data);
-                }
-            }
-
-            // console.log("getting boi.... TT",data);
-            // sourceBuffer.appendBuffer(data);
-            audio.play();
-        })
-    }catch(e){
-        console.log(e);
-    }
-});
+console.log("audio created");
 
 
-const Main = () => {
+const Main = (props) => {
+    const history = useHistory();
+    const user = JSON.parse(localStorage.getItem('user'));
     const joinBtn = useRef();
     const navBar = useRef()
-    const user = JSON.parse(localStorage.getItem('user'));
     const message = useRef();
     const roomId = useRef();
     const [messages, setMessages] = useState([]);
-    const [joined, setJoined] = useState(false);
+    const {userState, setUserState, userStateRef} = useContext(UserContext)
+    const [fuck, setFuck] = useState("fuck");
+    const [profile, setProfile] = useState(false)
 
+    
     useEffect(() => {
-        console.log(messages)
-    }, [messages])
+        console.log("hehe", userState.playlist)
+        if(userState.playlist.length === 1 && !userState.playing){
+            console.log("only one so play")
+            audio.src = userState.playlist[0].url
+            setUserState(user => ({...user, playing : true, currSong : user.playlist[0]}))
+            audio.play()
+        }
+    }, [userState.playlist])
+            
     useEffect(() => {
-        socket.on("answer", data =>{
-            console.log("answer : " , data)
-            connection.setRemoteDescription(data).
-            then(e => console.log("connected ig", connection.remoteDescription))
+     
+        console.log("userState : ", userState)
+        roomId.current.value = userState.roomId
+        const userDetails = localStorage.getItem("user");
+        if(!userDetails){
+            history.push("/profile")
+        }
+        if(props.match.params.room_id){
+            setUserState(user => ({...user, roomId: props.match.params.room_id}))
+            roomId.current.value = props.match.params.room_id
+        }
+
+        audio.addEventListener('ended', () => {
+            console.log('ended');
+            if(userStateRef.current.playlist.length > 1){
+                console.log("playing next", userState.playlist.length)
+                audio.src = userStateRef.current.playlist[1].url;
+                audio.play();
+                setUserState(user => {
+                    console.log(user, "fuckkkkk");
+                    return {...user, playlist : [...user.playlist.slice(1)], currSong : user.playlist.slice(1)[0] || {url : "", title : "", thumbnail : ""}, playing : true}
+                })      
+            }else{
+                audio.src = ""
+                setUserState(user => ({...user, playlist : [], currSong : {url : "", title : "", thumbnail : ""}, playing : false}))      
+            }
+
         })
-
-        socket.on('newMessage', (message) => {  
-            counter++;
-            console.log(counter)
+        
+        
+        socket.on('new-message', data => {
+            const temp = {
+                message : data.message,
+                user : data.user
+            } 
             setMessages(m =>{
-                return [...m, {...message}];
+                return [...m, {...temp}];
             })
         })
 
-        socket.on("playSong", (data) => {
-            console.log(data, "should play songs")
-            audio.src = data.url;
-            audio.play();
+        socket.on("trickle", data => {
+            setUserState(user => ({...user,playlist : [...user.playlist, data]}));
         })
 
-        ss(socket).on("stream", (stream)=>{
-            console.log("stream----",stream)
-            audio.src = stream;
+        
+        socket.on("play-song", data => {
+            console.log(data, "should play songs")
+            console.log(userState.playlist)
+            setUserState(user => ({...user, playlist: [...user.playlist, data]}))
+            setFuck("fuck you")
+            // if(!userState.playing){
+            //     audio.src = userState.playlist[0].url;
+            //     audio.play();
+            //     setUserState(user => ({...user, playing : true, currSong : user.playlist[0]}))
+            // }
+        })
+
+        socket.on("pause-song", data => {
+            console.log("paused")
+            audio.pause();
+        })
+
+        socket.on("resume-song", data => {
+            console.log("resumed")
             audio.play();
-        });
-        // audio.src = stream;
+        })
+        
+        socket.on("skip-song", data => {
+            skip();
+        })
+
+        socket.on("reset-all", data => {
+            console.log("reset all")
+            audio.src = "";
+            setUserState(user => ({...user, playlist : [], currSong : {url : "", title : "", thumbnail : ""}, playing : false}))
+        })
 
     } , [])
 
-    const stream = () => {
-        if(message.current.value && roomId.current.value){
-            console.log("streaming")
-            const data = {
-                roomId : roomId.current.value,
-                song : message.current.value
-            }
-            // socket.emit('playSong', data);
-            socket.emit("startStream", data);
-        }
-    }
 
-    const submit = () => {
-        console.log("emmitting message")
-        if(message.current.value !== ''){
+    const sendMessage = () => {
+        console.log("sending message")
+        if(message.current.value !== '' && roomId.current.value && userState.joined){
             const temp = {
                 message: message.current.value,
                 user: 'me'
             }
-            dc.send(message.current.value);
             setMessages((m) => { return [...m, {...temp}]});
             const data = {
                 message: message.current.value,
                 roomId: roomId.current.value,
                 user : user.username
             }
-            socket.emit('wrtc-message', data);
+            
+            switch(true){
+                case data.message.startsWith('?play'): play(); break;
+                case data.message.startsWith('?pause'): socket.emit("pause", roomId.current.value); break;
+                case data.message.startsWith('?resume'): socket.emit("resume", roomId.current.value); break;
+                case data.message.startsWith('?skip'): socket.emit("skip", roomId.current.value); break;
+                case data.message.startsWith('?reset'): socket.emit("reset", roomId.current.value); break;
+                default: break;
+            }
             socket.emit('message', data);
             message.current.value = '';
         }
     }
+
     const joinRoom = () => {
         if(roomId.current.value){
+            setUserState(t => ({...t, roomId: roomId.current.value, joined : true}))
             console.log("Joining");
-            connection.createOffer()
-            .then(offer2 => {
-                connection.setLocalDescription(offer2);
-                socket.emit('offer', {
-                    offer: offer2,
-                    roomId: roomId.current.value,
-                    user: user.username
-                });
-            })
-            .then(e => console.log("set successfully"))
-
-            setJoined(true);
             joinBtn.current.style.disabled = true;
-            socket.emit('joinRoom', roomId.current.value);
+            socket.emit('join-room', roomId.current.value);
         }
     }
+
+    const createRoom = () => {
+        const randomRoomId = uuid();
+        roomId.current.value = randomRoomId;
+        joinRoom();
+    }
+
+    const leaveRoom = () => {
+        socket.emit("leave-room", roomId.current.value);
+        roomId.current.value = "";
+        setUserState(curr => ({...curr, roomId : "", joined : false, currSong : {url : "", title : "", thumbnail : track}, playlist : [], playing : false}))
+        setMessages([])
+    }
+
+    const play = () => {
+        let data = {
+            roomId : roomId.current.value,
+            song : (message.current.value).split(" ").slice(1).join(" ")
+        }
+        console.log("Play the song", data.song)
+        socket.emit("play", data);
+    }
+
+    const invite = () => {
+        console.log("Copied to clipboard")
+        navigator.clipboard.writeText(window.location.host + "/" +roomId.current.value);
+    }
+
+    const skip = () => {
+        console.log("skipping")
+        if(userStateRef.current.playlist.length > 1){
+            console.log("playing next", userStateRef.current.playlist.length)
+            audio.src = userStateRef.current.playlist[1].url;
+            audio.play();
+            setUserState(user => ({...user, playlist : [...user.playlist.slice(1)], currSong : user.playlist.slice(1)[0] || {url : "", title : "", thumbnail : ""}, playing : true}))      
+        }else{
+            audio.src = ""
+            setUserState(user => ({...user, playlist : [], currSong : {url : "", title : "", thumbnail : ""}, playing : false}))      
+        }
+    }
+
     return (
         <>  
-            <div className="h-16 flex items-center bg-gray-800">
+            <div className="h-16 flex items-center bg-cdark-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-4 text-white lg:hidden" onClick={()=>{
                     navBar.current.classList.toggle('hidden');
                 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
-                <div ref={navBar} id="nav-pane" className="hidden flex nav-height lg:w-nav-w flex-col absolute top-16 lg:static lg:flex lg:flex-row border-t-1 border-gray-600 bg-gray-800 text-white py-2 items-center">
-                    <div className="justify-self-start">
-                        <button ref={joinBtn} disabled={joined} className={`ml-2 bg-gray-600 py-1 px-4 rounded border border-transparent hover:border-gray-400 hover:bg-gray-700 ${joined && "cursor-not-allowed"}`} onClick={joinRoom}>{joined? "Joined" : "Join"}</button>
-                        <button className="bg-gray-600 py-1 px-4 rounded border border-transparent hover:border-gray-400 ml-2 hover:bg-gray-700">Create</button>
-                    </div>
-                    <div className="mx-auto flex flex-col py-4 lg:flex-row lg:py-0">
-                        <span className="w-auto mx-auto">Room Id : </span>
-                        <input ref={roomId} type="text" className="w-auto border-0 ring-0 py-1 px-2 rounded-none bg-transparent border-b text-white" />
-                    </div>
-                </div>
-                <div className="justify-self-end w-auto mr-2 ml-auto flex items-center">
-                    {/* <h2 className="block">username</h2> */}
-                    <img src={user.img} className="ml-2 w-11 h-11 object-cover rounded-full" alt="" />
-                </div>
-            </div>
-            <div id="main-container" className="w-full h-nav-h bg-gray-100 flex">
-                <div className="w-96 bg-gray-800 border-t hidden lg:flex lg:flex-col border-gray-600 items-center">
-                    <span className="mt-4 text-xl text-white font-bold h-10 mb-2">Playlist</span>
-                    <ul className="w-full">
-                        {/* <li className="h-10 border-b-2 border-gray-800 flex justify-center items-center bg-gray-600 w-full">Nick</li> */}
-                    </ul>
-                </div>
-                <div className="h-full w-full bg-gray-900 flex flex-col">
-                    <div id="message-box" className="h-full flex flex-col border-t border-gray-600 overflow-scroll overflow-x-hidden p-4">
-                        {   
-                            messages.map((message, index) => {
-                                return message.user !== 'me' ? (
-                                <div className=" flex flex-row justify-start rounded-md" key={index}>
-                                    <div className="p-1 flex flex-col">
-                                        <div className="text-blue-300 text-xs w-auto">{message.user}</div>
-                                        <div className="bg-blue-200 w-auto p-1 px-2 rounded">{message.message}</div>
-                                    </div>
-                                </div>
-                                ):(
-                                <div className=" flex flex-row justify-end rounded-md" key={index}>
-                                    <div className="flex flex-col p-1 justify-center items-end">
-                                        <div className="bg-red-200 p-1 px-2 rounded">{message.message}</div>
-                                        <div className="text-red-500 text-xs">{message.user}</div>
-                                    </div>
-                                </div>
-                                )
-                            })
-                        }
-                    </div>
-                    <div className="h-14 flex items-center justify-evenly">
-                        <input ref={message} type="text" className="w-5/6 h-8" placeholder="Enter commands" onKeyUp={(e) => {
-                            if(e.key === 'Enter'){
-                                submit();
-                                console.log("enter pressed");
-                            }
-                        }} />
-                        <svg onClick={submit} xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-300 transform rotate-90 cursor-pointer hover:text-blue-200" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                        </svg>
-                        <button className="bg-blue-300 rounded-sm px-2 py-1" onClick={stream}>Play</button>
-                        <button className="bg-blue-300 rounded-sm px-2 py-1" onClick={() => {
-                            console.log("playing")
-                            audio.play()
 
-                            }}>Play Audio</button>
+                <div ref={navBar} id="nav-pane" className="hidden flex nav-height lg:w-nav-w flex-col absolute top-16 lg:static lg:flex lg:flex-row bg-cdark-3 lg:bg-cdark-2 text-white py-2 items-center">
+                    {/* <div className="justify-self-start"> */}
+                        <button ref={joinBtn} disabled={userState.joined} className={`mt-2 lg:ml-2 bg-green-600 py-1 px-4 rounded border border-transparent hover:border-clight-0 hover:bg-green-700 lg:mt-0 ${userState.joined && "cursor-not-allowed"}`} onClick={joinRoom}>{userState.joined? "Joined" : "Join"}</button>
+                        { userState.joined ? 
+                        <button className="bg-red-600 py-1 px-4 rounded border-0 border-transparent hover:border-clight-0 lg:mt-0 mt-2 lg:ml-2 hover:bg-red-700" onClick={leaveRoom} >Leave</button>
+                         :
+                        <button className="bg-cdark-0 py-1 px-4 rounded border border-transparent hover:border-clight-0 lg:mt-0 mt-2 lg:ml-2 hover:bg-cdark-2" onClick={createRoom} >Create</button>
+                        }
+                    {/* </div> */}
+                        {
+                            userState.joined &&
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mt-2 lg:mt-0 lg:ml-2 cursor-pointer" fill="none" viewBox="0 0 24 24" onClick={invite} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                        }
+                    <div className="mx-auto flex flex-col py-4 lg:flex-row lg:py-0 text-red-500 font-bold">
+                        <span className="w-auto mx-auto">Room Id : </span>
+                        <input ref={roomId} readOnly={userState.joined} type="text" className="w-80 border-0 text-sm border-cdark-0 text-center ring-0 py-1 px-1 rounded-none bg-transparent border-b text-white" />
                     </div>
                 </div>
+
+                <div className="justify-self-end w-auto mr-2 ml-auto flex items-center">
+                    {/* <h2 className="block">{user.username}</h2> */}
+                    <img src={user.img} className="ml-2 w-11 h-11 object-cover rounded-full" alt="" onClick={() => setProfile(true)} />
+                </div>
             </div>
+            {   profile?
+                <Login cb={() => setProfile(false)} />
+                :
+                <div id="main-container" className="w-full h-nav-h bg-cdark-1 flex">
+                    <div className="w-72 bg-cdark-3 hidden lg:flex lg:flex-col items-center">
+                        <span className="mt-4 text-xl text-red-400 font-bold h-10 mb-2">Queue</span>
+                        <ul className="w-full h-4/6 overflow-scroll">
+                            {
+                                userState.playlist.map((song, index) => {
+                                    return (       
+                                        <li key={index} className={`h-12 px-2 m-1 text-sm text-white flex justify-start items-center hover:bg-cdark-0 w-auto ${index==0? "bg-cdark-0" : "bg-cdark-1"}`}>
+                                            <img src={song.thumbnail || track} alt="" className="h-5 w-6 mx-1 mr-2" />
+                                            <p className="truncate w-auto">
+                                                {song.title}
+                                            </p>
+                                        </li> 
+                                    )
+                                })
+                            }  
+                        </ul>
+                        <CustomAudio audio = {audio} />
+                    </div>
+
+                    <div className="h-full w-full cdark-3 flex flex-col justify-around">
+                        <div id="message-box" className="h-full flex flex-col overflow-scroll overflow-x-hidden p-4">
+                            {   
+                                messages.map((message, index) => {
+                                    return message.user !== 'me' ? (
+                                    <div className=" flex flex-row justify-start rounded-md" key={index}>
+                                        <div className="p-1 flex flex-col">
+                                            <div className="text-blue-300 text-xs w-auto">{message.user}</div>
+                                            <div className="bg-blue-200 w-auto p-1 px-2 rounded">{message.message}</div>
+                                        </div>
+                                    </div>
+                                    ):(
+                                    <div className=" flex flex-row justify-end rounded-md" key={index}>
+                                        <div className="flex flex-col p-1 justify-center items-end">
+                                            <div className="bg-red-200 p-1 px-2 rounded">{message.message}</div>
+                                            <div className="text-red-500 text-xs">{message.user}</div>
+                                        </div>
+                                    </div>
+                                    )
+                                })
+                            }
+                        </div>
+                        <div className="h-14 mt-auto bg-cdark-0 flex items-center justify-evenly">
+                            <input ref={message} type="text" className="w-5/6 h-8 px-2 py-1 outline-none rounded-sm bg-transparent border border-clight-3 text-clight-0 focus:border-2 focus:border-blue-500" placeholder="Enter commands" onKeyUp={(e) => {
+                                if(e.key === 'Enter'){
+                                    sendMessage();
+                                    console.log("enter pressed");
+                                }
+                            }} />
+                            <svg onClick={sendMessage} xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-clight-2 transform rotate-90 cursor-pointer hover:text-blue-200" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+            }
 
         </>
     )

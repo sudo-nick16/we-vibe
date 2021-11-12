@@ -2,35 +2,74 @@ require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
 const socket = require('socket.io');
-const ss = require('socket.io-stream');
-const ytStream = require('youtube-audio-stream');
 const yts = require('youtube-search-api');
-const ytdl = require('ytdl-core')
-const got = require('got');
-const https = require('https');
-const webrtc = require('wrtc');
+const ytdl = require('ytdl-core');
+const ytps = require('yt-search');
 
-var mp4Url;
 
 const getAudioUrl = async(searchStr)=>{
-    const data = await yts.GetListByKeyword(searchStr,[false]);
-    let vidId = data['items'][0]['id'];
-    let title = data['items'][0]['title'];
-    let thumbnail = data['items'][0]['thumbnail']['thumbnails'][0]['url'];
-    const songInfo = await ytdl.getInfo(`https://www.youtube.com/watch?v=${vidId}`)
-    for(let i in songInfo['formats']){
-        if(songInfo['formats'][i].hasOwnProperty('mimeType')){
-            if(songInfo['formats'][i].mimeType === 'audio/mp4; codecs="mp4a.40.2"'){
-            // if(songInfo['formats'][i].mimeType === 'audio/webm; codecs="opus"'){
-                console.log(songInfo['formats'][i]);
-                const song = {
-                    url : songInfo['formats'][i].url,
-                    title : title,
-                    thumbnail : thumbnail
-                }         
-                return song;
+    try{
+        const data = await yts.GetListByKeyword(searchStr + "- song lyrics",[false]);
+        let vidId = data['items'][0]['id'];
+        let title = data['items'][0]['title'];
+        let thumbnail = data['items'][0]['thumbnail']['thumbnails'][0]['url'];
+        const songInfo = await ytdl.getInfo(`https://www.youtube.com/watch?v=${vidId}`)
+        for(let i in songInfo['formats']){
+            if(songInfo['formats'][i].hasOwnProperty('mimeType')){
+                if(songInfo['formats'][i].mimeType === 'audio/mp4; codecs="mp4a.40.2"'){
+                // if(songInfo['formats'][i].mimeType === 'audio/webm; codecs="opus"'){
+                    // console.log(songInfo['formats'][i]);
+                    const song = {
+                        url : songInfo['formats'][i].url,
+                        title : title,
+                        thumbnail : thumbnail
+                    }         
+                    return song;
+                }
             }
         }
+    }catch(err){
+        return false;
+    }
+}
+
+const getPlaylist = async(listUrl)=>{
+    let strIndex = listUrl.indexOf('list=')
+    let listId = listUrl.substring(strIndex+5, listUrl.length)
+    const list = await ytps({listId : listId})
+    let videoIds = []
+    for(let i in list.videos){
+        videoIds.push(list.videos[i]["videoId"])
+    }
+    return videoIds
+}
+
+const getAudioById = async(id)=>{
+    try{
+        const songInfo = await ytdl.getInfo(`https://www.youtube.com/watch?v=${id}`)
+        console.log(songInfo)
+        for(let i in songInfo['formats']){
+            if(songInfo['formats'][i].hasOwnProperty('mimeType')){
+                if(songInfo['formats'][i].mimeType === 'audio/mp4; codecs="mp4a.40.2"'){
+                // if(songInfo['formats'][i].mimeType === 'audio/webm; codecs="opus"'){
+                    // console.log(songInfo['formats'][i]);
+                    const song = {
+                        url : songInfo['formats'][i].url,
+                        thumbnail : `https://i.ytimg.com/vi/${id}/hq720.jpg`,
+                        title : songInfo.videoDetails.title
+                    }         
+                    // console.log(song)
+                    return song
+                }
+            }
+        }
+    }catch(err){
+        const song = {
+            url : "",
+            thumbnail : "",
+            title : ""
+        }
+        return song
     }
 }
 
@@ -49,14 +88,10 @@ app.use(cors({
 
 app.use(express.urlencoded({ extended: true }));
 
-// app.get("/", (req, res) => {
-//     res.send("Hello World!");
-// });
 
-const server = app.listen(3005, () => {
+const server = app.listen(process.env.PORT || 3005, () => {
     console.log('Server is running on port 3005');
 });
-
 
 const io = socket(server, {
     cors : {
@@ -64,85 +99,85 @@ const io = socket(server, {
     }
 });
 
+const ytId = (url) => {
+    var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    var match = url.match(regExp);
+    return (match&&match[7].length==11)? match[7] : false;
+}
 
 
-
-io.on("connection", socket => {
-
-    // wConnection.onicecandidate = e => {
-        //     var answer = wConnection.localDescription;
-        //     console.log("ansswer");
-        // }
-        
-socket.on("offer", data => {
-    console.log(data);
-    const wConnection = new webrtc.RTCPeerConnection(
-        {
-            iceServers: [
-                {
-                    urls: 'stun:stun.l.google.com:19302'
-                }
-            ]
-        }
-    );
-    wConnection.ondatachannel = e => {
-        wConnection.dc = e.channel;
-        wConnection.dc.onmessage = e => {
-            console.log("message : " + e.data);
-        }
-        wConnection.dc.onopen = e => console.log("data channel open");
-    }
-    wConnection.setRemoteDescription(data.offer);
-    wConnection.createAnswer()
-    .then(ans => {
-        wConnection.setLocalDescription(ans);
-    })
-    .then(e => {
-        socket.emit("answer", wConnection.localDescription);
-        console.log("answered");
-    })
-    socket.on("wrtc-message", data => {
-        wConnection.dc.send(data.message);
-    })
-})
-
-    console.log(socket.id);
-
-    socket.on("startStream", async (song) => {
-        try{
-            const url = await getAudioUrl(song.song);
-            const stream = got.stream(url);
-            console.log(stream);
-            let flag = true;
-            stream.addListener("data", (data) => {
-                if(flag){
-                    console.log(data, "type : ", typeof(data));
-                    flag = false;
-                }
-                io.to(song.roomId).emit("songStream", data);
-            })
-        }catch(err){
-            console.log(err);
-        }
+io.on("connection", async (socket) => {
+    
+    console.log("connected :", socket.id);
+    
+    socket.on('disconnect', () => {
+        console.log('disconnected');
     })
     
-    socket.on("joinRoom",(data) => {
-        console.log(data);
+    socket.on("join-room", async (data) => {
+        console.log("Joining room => ",data);
         socket.join(data);
     })
 
+    socket.on("leave-room", data => {
+        console.log("Leaving room =>", data)
+        socket.leave(data)
+    })
 
     socket.on("message", (data) => {
         console.log("data to be sent",data);
-        // wConnection.dc.send(data.message)
-        socket.to(data.roomId).emit("newMessage", data);
-        // socket.broadcast.emit("newMessage", data);
+        socket.to(data.roomId).emit("new-message", data);
     })
-    socket.on("playSong", async (data) => {
-        console.log(data, data.roomId)
-        const song = await getAudioUrl(data.song)
-        console.log(song)
-        io.to(data.roomId).emit("playSong", song)
+
+    socket.on("skip", roomId => {
+        console.log("skip", roomId);
+        io.to(roomId).emit("skip-song")
+    })
+
+    socket.on("reset", roomId => {
+        console.log("reset", roomId);
+        io.to(roomId).emit("reset-all")
+    })
+
+    const playlistHandler = async (props) => {
+        const {vidIds, roomId} = props;
+        for(let i of vidIds){
+            const song = await getAudioById(i);
+            io.to(roomId).emit("trickle", song);
+        }
+    }
+
+    socket.on("play", async (data) => {
+        if(data.song.includes("playlist?list=")){
+            // console.log("playlist");
+            console.log(data.song);
+            const vidIds = await getPlaylist(data.song.split(" ").slice(1).join(" "));
+            // console.log(vidIds);
+            const song = await getAudioById(vidIds[0]);
+            io.to(data.roomId).emit("trickle", song);
+            vidIds.shift();
+            playlistHandler({vidIds, roomId : data.roomId});
+            return
+        }else if(data.song.includes("watch?v=") || data.song.includes("youtu.be/")){
+            const id = ytId(data.song);
+            console.log(id)
+            const song = await getAudioById(id);
+            io.to(data.roomId).emit("play-song", song);
+            return
+        }
+        const song = await getAudioUrl(data.song);
+        io.to(data.roomId).emit("play-song", song)
+
+    })
+
+    socket.on("pause", roomId => {
+        console.log("Pause", roomId)
+        io.to(roomId).emit("pause-song");
+    })
+
+    socket.on("resume", roomId => {
+        io.to(roomId).emit("resume-song");
     })
     
 })
+

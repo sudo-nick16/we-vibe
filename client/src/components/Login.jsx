@@ -1,29 +1,31 @@
-import React, { useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router';
+import { UserContext } from '../context/UserContext';
 import pfp from '../images/default.png'
 
-const Login = () => {
-    const [img, setImg] = useState(pfp);
-    const username = useRef();
-    const [imgBlob, setImgBlob] = useState(pfp);
+const Login = ({cb}) => {
+    const {userState, setUserState} = useContext(UserContext);
+    const [img, setImg] = useState(userState.img || pfp);
+    const [imgBlob, setImgBlob] = useState(userState.img || pfp);
     const history = useHistory();
+    console.log(useContext(UserContext))
 
-    if(localStorage.getItem('user')){
-        history.push('/home');
-    }
-
-    const nextBtnHandler = () => {
-        if(username.current.value.trim() || imgBlob) {
+    const nextBtnHandler = (cb) => {
+        if(userState.username.trim() || imgBlob) {
             localStorage.setItem('user', JSON.stringify({
-                username: username.current.value,
+                username: userState.username,
                 img: imgBlob
             }));
-            history.push('/home');
+            setUserState(u => ({...u, img : imgBlob}))
+            history.push('/');
+        }
+        if(cb){
+            cb();
         }
     }
     return (
-        <div className="h-full w-full flex justify-center items-center">
-            <div className="flex flex-col h-80 rounded-md w-80 p-4 items-center bg-gray-800">
+        <div className="h-full w-full flex justify-center items-center bg-cdark-3">
+            <div className="flex flex-col h-80 rounded-md w-80 p-4 items-center bg-cdark-2 border border-cdark-2 shadow-md">
                 <h1 className="text-white mt-2 text-center text-xl font-bold">Profile</h1>
                 <div className="w-full flex justify-center items-center">
                     <label className="mt-4" htmlFor="pfp-upload">
@@ -40,8 +42,8 @@ const Login = () => {
                         }
                     }} />
                 </div>
-                <input ref={username} className="mt-4 block" type="text" placeholder="Enter username" />
-                <button onClick={nextBtnHandler} className="mt-4 px-4 py-1 bg-gray-800  border-2 hover:border-transparent rounded border-gray-600 hover:bg-gray-600 text-white">Next</button>
+                <input value = {userState.username} className="mt-4 block text-md rounded px-2 py-1 bg-transparent border border-cdark-0 text-red-400 font-bold" onChange={e => setUserState(curr => ({...curr, username : e.target.value}))} type="text" placeholder="Enter username" />
+                <button onClick={() => nextBtnHandler(cb)} className="mt-4 text-sm px-4 py-1 border hover:border-transparent rounded border-cdark-0 hover:bg-cdark-3 text-green-600">Next</button>
             </div>
         </div>
     )
