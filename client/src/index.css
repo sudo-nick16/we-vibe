@@ -39,6 +39,14 @@ body, #root{
   width: calc(100% - 3rem);
 }
 
+tr{
+  @apply text-yellow-300 font-thin ;
+}
+
+td{
+  @apply text-base;
+}
+
 .nav-height{
   height: calc(100% - 4rem);
 }

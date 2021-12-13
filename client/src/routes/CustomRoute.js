@@ -1,17 +1,21 @@
-import React, { Component } from 'react'
-import { Redirect, Route, useHistory } from 'react-router';
-import Login from '../components/Login';
-import Main from '../components/Main';
+import React, { useContext, useEffect } from 'react'
+import { Route } from 'react-router';
+import { UserContext } from '../context/UserContext';
 
 const CustomRoute = ({component : Component, ...rest}) => {
-    const history = useHistory();
+    const {userState, setUserState} = useContext(UserContext);
     const user = JSON.parse(localStorage.getItem("user"))
-    console.log("router exec")
+    useEffect(() => {
+        if(user){
+            const {username, img} = user;
+            setUserState(user => ({...user, username, img}));
+        }
+    }, [])
     return (user?
-        <Route render={props => <Component {...props}/>} {...rest} />
+        <Route render={props => <Component {...props} profile = {false} />} {...rest} />
         :
-        <Redirect to="/profile" />)
-    
+        <Route render={props => <Component {...props} profile = {true}  />} {...rest} />
+        )
 }
 
 export default CustomRoute

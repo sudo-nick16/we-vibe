@@ -9,7 +9,7 @@ const ytps = require('yt-search');
 
 const getAudioUrl = async(searchStr)=>{
     try{
-        const data = await yts.GetListByKeyword(searchStr + "- song lyrics",[false]);
+        const data = await yts.GetListByKeyword(searchStr + "- song",[false]);
         let vidId = data['items'][0]['id'];
         let title = data['items'][0]['title'];
         let thumbnail = data['items'][0]['thumbnail']['thumbnails'][0]['url'];
@@ -36,7 +36,13 @@ const getAudioUrl = async(searchStr)=>{
 const getPlaylist = async(listUrl)=>{
     let strIndex = listUrl.indexOf('list=')
     let listId = listUrl.substring(strIndex+5, listUrl.length)
-    const list = await ytps({listId : listId})
+    let list;
+    try{
+        list = await ytps({listId : listId})
+
+    }catch(err){
+        return false;
+    }
     let videoIds = []
     for(let i in list.videos){
         videoIds.push(list.videos[i]["videoId"])
@@ -47,7 +53,6 @@ const getPlaylist = async(listUrl)=>{
 const getAudioById = async(id)=>{
     try{
         const songInfo = await ytdl.getInfo(`https://www.youtube.com/watch?v=${id}`)
-        console.log(songInfo)
         for(let i in songInfo['formats']){
             if(songInfo['formats'][i].hasOwnProperty('mimeType')){
                 if(songInfo['formats'][i].mimeType === 'audio/mp4; codecs="mp4a.40.2"'){
@@ -151,8 +156,12 @@ io.on("connection", async (socket) => {
         if(data.song.includes("playlist?list=")){
             // console.log("playlist");
             console.log(data.song);
-            const vidIds = await getPlaylist(data.song.split(" ").slice(1).join(" "));
+            const vidIds = await getPlaylist(data.song);
             // console.log(vidIds);
+            if(!vidIds){
+                console.log("playlist not found");
+                return;
+            }
             const song = await getAudioById(vidIds[0]);
             io.to(data.roomId).emit("trickle", song);
             vidIds.shift();
