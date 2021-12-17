@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router';
 import { io } from 'socket.io-client';
 import {v4 as uuid} from 'uuid';
@@ -132,17 +132,17 @@ const Main = (props) => {
             }
             
             switch(true){
-                case data.message.split(" ")[0]=="?play": play(); break;
-                case data.message.split(" ")[0]=="?pause": socket.emit("pause", roomId.current.value); break;
-                case data.message.split(" ")[0]=="?resume": socket.emit("resume", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?play": play(); break;
+                case data.message.split(" ")[0]==="?pause": socket.emit("pause", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?resume": socket.emit("resume", roomId.current.value); break;
                 case data.message.startsWith('?skip'): socket.emit("skip", roomId.current.value); break;
                 case data.message.startsWith('?reset'): socket.emit("reset", roomId.current.value); break;
 
-                case data.message.split(" ")[0]=="?p": play(); break;
-                case data.message.split(" ")[0]=="?v": socket.emit("pause", roomId.current.value); break;
-                case data.message.split(" ")[0]=="?r": socket.emit("resume", roomId.current.value); break;
-                case data.message.split(" ")[0]=="?s": socket.emit("skip", roomId.current.value); break;
-                case data.message.split(" ")[0]=="?rip": socket.emit("reset", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?p": play(); break;
+                case data.message.split(" ")[0]==="?v": socket.emit("pause", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?r": socket.emit("resume", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?s": socket.emit("skip", roomId.current.value); break;
+                case data.message.split(" ")[0]==="?rip": socket.emit("reset", roomId.current.value); break;
                 default: break;
             }
             socket.emit('message', data);
@@ -179,7 +179,7 @@ const Main = (props) => {
             roomId : roomId.current.value,
             song : (message.current.value).split(" ").slice(1).join(" ")
         }
-        // console.log("Play the song", data.song)
+        console.log("Play the song", data.song)
         socket.emit("play", data);
     }
 
@@ -246,7 +246,7 @@ const Main = (props) => {
                         {
                             userState.playlist.map((song, index) => {
                                 return (       
-                                    <li key={index} className={`h-12 px-2 m-1 text-sm text-white flex justify-start items-center hover:bg-cdark-0 w-auto ${index==0? "bg-cdark-0" : "bg-cdark-1"}`}>
+                                    <li key={index} className={`h-12 px-2 m-1 text-sm text-white flex justify-start items-center hover:bg-cdark-0 w-auto ${index === 0? "bg-cdark-0" : "bg-cdark-1"}`}>
                                         <img src={song.thumbnail || track} alt="" className="h-5 w-6 mx-1 mr-2" />
                                         <p className="truncate w-auto">
                                             {song.title}
@@ -283,7 +283,7 @@ const Main = (props) => {
                     </div>
                     <div className="h-14 mt-auto bg-cdark-0 flex items-center justify-evenly">
                     <svg onClick={() => setShowHelp(true)} xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-clight-2 cursor-pointer" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                     </svg>
                         <input ref={message} type="text" className="w-5/6 h-8 px-2 py-1 outline-none rounded-sm bg-transparent border border-clight-3 text-clight-0 focus:border-2 focus:border-blue-500" placeholder="Enter commands" onKeyUp={(e) => {
                             if(e.key === 'Enter'){

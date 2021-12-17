@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useHistory } from 'react-router';
 import { UserContext } from '../context/UserContext';
 import pfp from '../images/default.png'
@@ -41,7 +41,7 @@ const Login = ({cb}) => {
                         }
                     }} />
                 </div>
-                <input value = {userState.username} className="mt-4 block text-md rounded px-2 py-1 bg-transparent border border-cdark-0 text-red-400 font-bold" onKeyUp={e => {if(e.code=="Enter")nextBtnHandler(cb)}} onChange={e => setUserState(curr => ({...curr, username : e.target.value}))} type="text" placeholder="Enter username" />
+                <input value = {userState.username} className="mt-4 block text-md rounded px-2 py-1 bg-transparent border border-cdark-0 text-red-400 font-bold" onKeyUp={e => {if(e.code==="Enter")nextBtnHandler(cb)}} onChange={e => setUserState(curr => ({...curr, username : e.target.value}))} type="text" placeholder="Enter username" />
                 <button onClick={() => nextBtnHandler(cb)} className="mt-4 text-sm px-4 py-1 border hover:border-transparent rounded border-cdark-0 hover:bg-cdark-3 text-green-600">Next</button>
             </div>
         </div>
