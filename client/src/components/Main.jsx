@@ -114,6 +114,11 @@ const Main = (props) => {
             setAudioState(audio => ({...audio, currTime : 0, duration : "0:00", muted : false}))
         })
 
+        audio.onerror = (e) => {
+            console.log("Couldn't play song")
+            skip();
+        }
+
     } , [])
 
 
@@ -215,7 +220,7 @@ const Main = (props) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
 
-                <div ref={navBar} id="nav-pane" className="hidden flex nav-height lg:w-nav-w flex-col absolute top-16 lg:static lg:flex lg:flex-row bg-cdark-3 lg:bg-cdark-2 text-white py-2 items-center">
+                <div ref={navBar} id="nav-pane" className="hidden nav-height lg:w-nav-w flex-col absolute top-16 lg:static lg:flex lg:flex-row bg-cdark-3 lg:bg-cdark-2 text-white py-2 items-center">
                     <button ref={joinBtn} disabled={userState.joined} className={`mt-2 lg:ml-2 bg-green-600 py-1 px-4 rounded border border-transparent hover:border-clight-0 hover:bg-green-700 lg:mt-0 ${userState.joined && "cursor-not-allowed"}`} onClick={joinRoom}>{userState.joined? "Joined" : "Join"}</button>
                     { userState.joined ? 
                     <button className="bg-red-600 py-1 px-4 rounded border-0 border-transparent hover:border-clight-0 lg:mt-0 mt-2 lg:ml-2 hover:bg-red-700" onClick={leaveRoom} >Leave</button>
