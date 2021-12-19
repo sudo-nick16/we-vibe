@@ -14,6 +14,7 @@ const socket = io(process.env.REACT_APP_SOCKET_URL, {forceNew: true});
 
 const audio = new Audio();
 
+
 const time = (time) => {
     let minute = Math.floor(time / 60);
     let seconds = time % 60;
@@ -67,9 +68,7 @@ const Main = (props) => {
                 audio.src = ""
                 setUserState(user => ({...user, playlist : [], currSong : {url : "", title : "", thumbnail : ""}, playing : false}))      
             }
-
         })
-        
         
         socket.on('new-message', data => {
             const temp = {
@@ -113,11 +112,6 @@ const Main = (props) => {
             setUserState(user => ({...user, playlist : [], currSong : {url : "", title : "", thumbnail : ""}, playing : false}));
             setAudioState(audio => ({...audio, currTime : 0, duration : "0:00", muted : false}))
         })
-
-        audio.onerror = (e) => {
-            console.log("Couldn't play song")
-            skip();
-        }
 
     } , [])
 
@@ -207,7 +201,6 @@ const Main = (props) => {
     }
 
     return (
-        // console.log("childs" , profileView),
         profileView?
         <Login cb={() => setProfileView(false)}  />
         :
